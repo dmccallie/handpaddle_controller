@@ -1,0 +1,54 @@
+body {
+    font-family: Arial, sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100vh;
+    background-color: #f7f7f7;
+}
+
+.controller {
+    display: grid;
+    grid-template-rows: 1fr 1fr 1fr;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 10px;
+}
+
+.controller button {
+    padding: 20px;
+    font-size: 20px;
+    cursor: pointer;
+}
+
+.controller button:active {
+    background-color: #4fdf1a; /* Change to your desired color */
+}
+
+.stop-btn {
+    background-color: red;
+    color: white;
+    font-weight: bold;
+    font-size: 24px;
+}
+
+.servers-combo-box {
+    width: 50px;
+    padding: 10px;
+    font-size: 20px;
+}
+
+table {
+    margin-top: 20px;
+    border-collapse: collapse;
+}
+
+table, th, td {
+    border: 1px solid black;
+}
+
+th, td {
+    padding: 10px;
+    text-align: center;
+    width: 100px;
+}

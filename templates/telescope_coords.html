@@ -1,0 +1,20 @@
+<table id="status-table">
+    <tr>
+        <th>Altitude</th>
+        <th>Azimuth</th>
+        <th>RA</th>
+        <th>DEC</th>
+        <th>Slewing</th>
+        <th>Tracking</th>
+        <th>Tracking Rate</th>
+    </tr>
+    <tr>
+        <td id="altitude">{{ '%0.2f'|format(coords.altitude) }}</td>
+        <td id="azimuth">{{'%0.2f'|format(coords.azimuth) }}</td>
+        <td id="ra">{{'%0.2f'|format(coords.ra) }}</td>
+        <td id="dec">{{'%0.2f'|format(coords.dec) }}</td>
+        <td id="slewing">{{coords.slewing}}</td>
+        <td id="tracking">{{coords.tracking}}</td>
+        <td id="tracking_rate">{{coords.tracking_rate}}</td>
+    </tr>
+</table>

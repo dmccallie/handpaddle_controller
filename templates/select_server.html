@@ -1,0 +1,17 @@
+<!-- Combo Box to show discovered servers. Gets added by HTML when select is ready -->
+
+<div id="server-search">
+    {% if servers_found %}
+        <form action="/server_select" method="POST">
+            <label for="servers-combo-box">Select Alpaca Server:</label>
+            <select name = "servers-combo-box" id="servers-combo-box" >
+                {% for server in servers_for_combo %}
+                <option value="{{ server.index }}">{{ server.name }}</option>
+                {% endfor %}
+            </select>
+            <input type="submit" value="Connect to Alpaca Server">
+        </form>
+    {% else %}
+        <p>No Alpaca servers found!</p>
+    {% endif %}
+</div>

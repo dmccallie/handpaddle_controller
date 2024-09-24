@@ -1,0 +1,63 @@
+
+{% extends "base.html" %}
+{% block content %}
+<h1>Telescope Control</h1>
+
+    <!-- combo to select tracking rates -->
+    <!-- selections come from telescope itself -->
+    <div id="tracking-rate">
+        <form hx-post="/set_tracking_rate">
+            <label for="tracking-rate">Select Tracking Rate:</label>
+            <select name="tracking-rate" id="tracking-rate">
+                {% for tr in tracking_rates %}
+                    <option value={{ tr.value }}>{{ tr.name }} </option>
+                {% endfor %}
+            </select>
+            <input type="submit" value="Set Tracking Rate">
+        </form>
+    </div>
+
+    <div class="controller" id="controller">
+        <!-- row 1 -->
+        <div></div>
+        <button 
+            hx-post="/control" 
+            hx-trigger="mousedown, mouseup from:body" 
+            hx-vals='js:{"direction":"UP", "event_type":(event.type==="mousedown")?"start":"end"}'
+            >UP
+        </button>
+        <div></div>
+
+        <!-- row 2 -->
+        <button 
+            hx-post="/control" 
+            hx-trigger="mousedown, mouseup from:body" 
+            hx-vals='js:{"direction":"LEFT", "event_type":(event.type==="mousedown")?"start":"end"}'>LEFT
+        </button>
+        <button 
+            class="stop-btn" 
+            hx-post="/control"
+            hx-trigger="mousedown, mouseup from:body"
+            hx-vals='js:{"direction":"STOP", "event_type":(event.type==="mousedown")?"start":"end"}'>STOP
+        </button>
+        <button 
+            hx-post="/control" 
+            hx-trigger="mousedown, mouseup from:body" 
+            hx-vals='js:{"direction":"RIGHT", "event_type":(event.type==="mousedown")?"start":"end"}'>RIGHT
+        </button>
+
+        <!-- row three -->    
+        <div></div>
+        <button 
+            hx-post="/control" 
+            hx-trigger="mousedown, mouseup from:body" 
+            hx-vals='js:{"direction":"DOWN", "event_type":(event.type==="mousedown")?"start":"end"}'>DOWN
+        </button>
+        <div></div>
+    </div>
+
+    <div hx-get="/status" hx-trigger="every 500ms" hx-target="#status-table" hx-swap="outerHTML">
+        {% include "telescope_coords.html" %}
+    </div>
+{% endblock %}
+

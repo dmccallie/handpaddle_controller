@@ -4,7 +4,7 @@ from flask import Flask, render_template, jsonify, request, redirect, url_for
 import random
 import time
 from telescope import CacheTelescope, AlpycaTelescope, get_servers
-from alpaca.telescope import DriveRates
+from alpaca.telescope import DriveRates, TelescopeAxes
 
 app = Flask(__name__)
 
@@ -57,9 +57,17 @@ def paddle():
     for tr in tracking_rates:
         print(f"Tracking rate: {tr.name} = {tr.value}")
 
+    # get the slewing rates supported by the telescope
+    # just check RA, assume same for DEC
+    # if None, then MoveAxis is not supported
+    slewing_rates = telescope.get_axisrates(axis=TelescopeAxes.axisPrimary)
+    # rates are in degrees per second!
+    for sr in slewing_rates:
+        print(f"Slewing rate: min: {sr.minv} and max: {sr.maxv}")
+
     return render_template('paddle.html', coords={'altitude': 0, 'azimuth': 0, 
             'ra': 0, 'dec': 0, 'slewing': False, 'tracking': False, 
-            'tracking_rate': 0}, tracking_rates=tracking_rates)
+            'tracking_rate': 0}, tracking_rates=tracking_rates, slewing_rates=slewing_rates)
 
 # control is called when a control button is pressed
 @app.route('/control', methods=['POST'])
@@ -88,12 +96,20 @@ def control():
 
     return '', 204  # Empty response, HTMX does not require content.
 
-@app.route('/set_tracking_rate', methods=['POST'])
-def set_tracking_rate():
+@app.route('/update_tracking', methods=['POST'])
+def update_tracking():
     rate = request.form.get('tracking-rate')
     if rate:
         rate = int(rate)
+    else:
+        rate = 0
     print(f"Setting tracking rate to {rate}")
+    tracking_on_off = request.form.get('tracking-enable')
+    print("set tracking on/off to: ", tracking_on_off)
+    if tracking_on_off == 'true':
+        telescope.set_tracking(True)
+    else:
+        telescope.set_tracking(False)
     telescope.set_tracking_rate(DriveRates(rate))
     return '', 204
 

@@ -3,7 +3,7 @@ import sys
 from flask import Flask, render_template, jsonify, request, redirect, url_for
 import random
 import time
-from telescope import CacheTelescope, AlpycaTelescope, get_servers
+from telescope import CacheTelescope, AlpycaTelescope, get_servers, MaestroTelescope
 from alpaca.telescope import DriveRates, TelescopeAxes
 
 app = Flask(__name__)
@@ -80,7 +80,7 @@ def server_select():
         print(f"Selected server: {selected_server}")
         # create telescope object and cache it
         try:
-            telescope = AlpycaTelescope(app, selected_server[0]) # selected_server[0] is the IP address
+            telescope = MaestroTelescope(app, selected_server[0]) # selected_server[0] is the IP address
             shared_servers_cache['telescope'] = telescope
         except Exception as e:
             print(f"Error connecting to telescope at {selected_server} error= {e}")
@@ -88,17 +88,17 @@ def server_select():
         
     return redirect(url_for('paddle'))
 
-# page to display paddle controls and telescope status
+# page to display all the paddle controls and telescope status
 @app.route('/paddle')
 def paddle():
 
     # should be connected to a telescope by now
-    telescope: AlpycaTelescope = shared_servers_cache['telescope']
+    telescope: MaestroTelescope = shared_servers_cache['telescope']
 
     # get the tracking rates supported by the telescope
-    tracking_rates:list[DriveRates] = telescope.get_tracking_rates()
+    tracking_rates:list[ DriveRates ] = telescope.get_tracking_rates()
     for tr in tracking_rates:
-        print(f"Tracking rate: {tr.name} = {tr.value}")
+        print(f"Found tracking rate: {tr.name} = {tr.value}")
 
     # get whether tracking is turned on
     tracking = telescope.is_tracking()
@@ -109,34 +109,49 @@ def paddle():
     # get the moveaxis rates supported by the telescope
     # just check RA, assume same for DEC
     # if None, then MoveAxis is not supported
+    
+    # rates are dict with number, name and rate
+    # for ascom, will be like "number: 2, name: "16x", rate: nnnn.nnnn"
+    # for maestro, will be like "number: 2, name: View Velocity 2", rate: xxxx.xxxx"
+    # rates will be in degrees per second??
+
     moveaxis_rates = telescope.get_MoveAxis_rates(axis=TelescopeAxes.axisPrimary)
-    # rates are in degrees per second!
     for mar in moveaxis_rates:
-        print(f"MoveAxis rate: mar name = {mar['name']} rate = {mar['rate']}")
+        print(f"Found MoveAxis rate: mar number = {mar['number']} name = {mar['name']} rate = {mar['rate']}")
+
+    # these need to be cached in shared memory for use when control is called
+    shared_servers_cache['moveaxis_rates'] = moveaxis_rates
+
+    # set the default move axis rate item to number 1
+    initial_rate_number = 1
+    shared_servers_cache['moveaxis_rate_item'] = moveaxis_rates[initial_rate_number]
 
     return render_template('paddle.html', coords={'altitude': 0, 'azimuth': 0, 
             'ra': 0, 'dec': 0, 'slewing': False, 'tracking': False, 
             'tracking_rate': 0}, tracking_rates=tracking_rates, 
                 current_tracking_rate=current_tracking_rate,
-                moveaxis_rates=moveaxis_rates, tracking=tracking)
+                moveaxis_rates=moveaxis_rates, selected_rate=initial_rate_number, tracking=tracking)
 
 # control is called when a control button is pressed
 @app.route('/control', methods=['POST'])
 def control():
     # get the telescope object from the cache
-    telescope: AlpycaTelescope = shared_servers_cache['telescope']
+    telescope: MaestroTelescope = shared_servers_cache['telescope']
 
     direction = request.form.get('direction')
     event_type = request.form.get('event_type')
     current_time = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
     
-    # get the current MoveAxis rate (is a float)
-    moveaxis_rate = shared_servers_cache['moveaxis_rate']
-    if moveaxis_rate is None:
-        moveaxis_rate = 1.0
+    # current slew rate is set via different POST event, so result was cached in shared memory
+    # get the current (cached) MoveAxis rate item containing both the number, name, and rate
+    # ascom uses rate, but maestro uses view velocity number
 
-
-    print(f"{direction}-{event_type} at {current_time}")
+    if 'moveaxis_rate_item' in shared_servers_cache:
+        rate_item = shared_servers_cache['moveaxis_rate_item']
+    else:
+        rate_item = {'number': 1, 'name': 'missing rate selection', 'rate': 0.0002777777777777778}
+    
+    print(f"control got {direction}-{event_type} at {current_time}")
     
     if direction == 'STOP':
         telescope.stop()
@@ -147,13 +162,13 @@ def control():
     
     elif event_type == "start":
         if direction == "UP":
-            telescope.moveAxis('Up', moveaxis_rate)
+            telescope.moveAxis('Up', rate_item)
         elif direction == "DOWN":
-            telescope.moveAxis('Down', moveaxis_rate)
+            telescope.moveAxis('Down', rate_item)
         elif direction == "LEFT":
-            telescope.moveAxis('Left', moveaxis_rate)
+            telescope.moveAxis('Left', rate_item)
         elif direction == "RIGHT":
-            telescope.moveAxis('Right', moveaxis_rate)
+            telescope.moveAxis('Right', rate_item)
 
     return '', 204  # Empty response, HTMX does not require content.
 
@@ -178,17 +193,23 @@ def update_tracking():
         telescope.set_tracking_rate(DriveRates(rate))
     return '', 204
 
-# called when changing the MoveAxis rate
-# need to cache this since we don't have a way to get the current MA rate from telescope
+# called when changing the MoveAxis rate (not same as tracking rate!)
+# need to cache the selected "rate_item" since we don't have a way to get the current MA rate from telescope
+# rate item has all info needed for moveaxis either for ASCOM or Maestro
+# rate item: {'number': 2, 'name': '16x', 'rate': 0.0002777777777777778}
+# or for maestro: {'number': 2, 'name': 'View Velocity 2', 'rate': 0.0002777777777777778}
 @app.route('/update_moveaxis_rate', methods=['POST'])
 def update_moveaxis_rate():
-    new_rate = request.form.get('moveaxis_rate')
-    if new_rate:
-        new_rate = float(new_rate)
+    new_rate_number = request.form.get('moveaxis_rate') # gets the rate number, not index
+    if new_rate_number:
+        new_rate_number = int(new_rate_number)
     else:
-        new_rate = 1.0
-    print(f"Setting MoveAxis rate to {new_rate}")
-    shared_servers_cache['moveaxis_rate'] = new_rate
+        new_rate_number = 1
+    # extract the rate item from the cached rates list
+    rate_item = shared_servers_cache['moveaxis_rates'][new_rate_number]
+
+    print(f"Caching new MoveAxis rate item to {rate_item}")
+    shared_servers_cache['moveaxis_rate_item'] = rate_item
     return '', 204
 
 
@@ -232,7 +253,8 @@ if __name__ == '__main__':
         shared_servers_cache['shared_server_list'] = servers  # cache in memory, will be shared across users
 
         shared_servers_cache['telescope'] = None # can't create telescope until user has selected a server
-        shared_servers_cache['moveaxis_rate'] = 1.0 # default rate for MoveAxis
+        shared_servers_cache['moveaxis_rates'] = None # can't get these until telescope is connected
+        shared_servers_cache['moveaxis_rate_item'] = None # 
 
     except Exception as e:
         print(f"Error getting servers: {e}")

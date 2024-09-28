@@ -31,7 +31,8 @@
             <label for="moveaxis_rate">Select MoveAxis Speed:</label>
             <select name="moveaxis_rate" id="moveaxis_rate">
                 {% for rate in moveaxis_rates %}
-                    <option value={{ rate.rate }}>{{ rate.name }} = {{ rate.rate }} </option>
+                    <option value={{ rate.number }} {% if rate.number == selected_rate %} selected {% endif %}>
+                        {{ rate.name }} = {{ rate.rate }} </option>
                 {% endfor %}
             </select>
             <br>

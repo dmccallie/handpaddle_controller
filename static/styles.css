@@ -8,6 +8,17 @@ body {
     background-color: #f7f7f7;
 }
 
+input {
+    margin: 5px;
+  }
+
+fieldset {
+    padding: 15px;
+    border: 1px solid black;
+    border-radius: 10px;
+    margin-bottom: 20px;
+}
+
 .controller {
     display: grid;
     grid-template-rows: 80px 80px 80px;

@@ -106,19 +106,19 @@ def paddle():
     # get current tracking rate
     current_tracking_rate = telescope.get_tracking_rate()
 
-    # get the slewing rates supported by the telescope
+    # get the moveaxis rates supported by the telescope
     # just check RA, assume same for DEC
     # if None, then MoveAxis is not supported
-    slewing_rates = telescope.get_axisrates(axis=TelescopeAxes.axisPrimary)
+    moveaxis_rates = telescope.get_MoveAxis_rates(axis=TelescopeAxes.axisPrimary)
     # rates are in degrees per second!
-    for sr in slewing_rates:
-        print(f"Slewing rate: min: {sr.minv} and max: {sr.maxv}")
+    for mar in moveaxis_rates:
+        print(f"MoveAxis rate: mar name = {mar['name']} rate = {mar['rate']}")
 
     return render_template('paddle.html', coords={'altitude': 0, 'azimuth': 0, 
             'ra': 0, 'dec': 0, 'slewing': False, 'tracking': False, 
             'tracking_rate': 0}, tracking_rates=tracking_rates, 
                 current_tracking_rate=current_tracking_rate,
-                slewing_rates=slewing_rates, tracking=tracking)
+                moveaxis_rates=moveaxis_rates, tracking=tracking)
 
 # control is called when a control button is pressed
 @app.route('/control', methods=['POST'])
@@ -130,23 +130,30 @@ def control():
     event_type = request.form.get('event_type')
     current_time = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
     
+    # get the current MoveAxis rate (is a float)
+    moveaxis_rate = shared_servers_cache['moveaxis_rate']
+    if moveaxis_rate is None:
+        moveaxis_rate = 1.0
+
+
     print(f"{direction}-{event_type} at {current_time}")
     
     if direction == 'STOP':
         telescope.stop()
     
+    # all moveaxis commands use the same "end" event
     elif event_type == "end":
         telescope.stop()
     
     elif event_type == "start":
         if direction == "UP":
-            telescope.moveAxis('Up')
+            telescope.moveAxis('Up', moveaxis_rate)
         elif direction == "DOWN":
-            telescope.moveAxis('Down')
+            telescope.moveAxis('Down', moveaxis_rate)
         elif direction == "LEFT":
-            telescope.moveAxis('Left')
+            telescope.moveAxis('Left', moveaxis_rate)
         elif direction == "RIGHT":
-            telescope.moveAxis('Right')
+            telescope.moveAxis('Right', moveaxis_rate)
 
     return '', 204  # Empty response, HTMX does not require content.
 
@@ -170,6 +177,20 @@ def update_tracking():
             telescope.set_tracking(False)
         telescope.set_tracking_rate(DriveRates(rate))
     return '', 204
+
+# called when changing the MoveAxis rate
+# need to cache this since we don't have a way to get the current MA rate from telescope
+@app.route('/update_moveaxis_rate', methods=['POST'])
+def update_moveaxis_rate():
+    new_rate = request.form.get('moveaxis_rate')
+    if new_rate:
+        new_rate = float(new_rate)
+    else:
+        new_rate = 1.0
+    print(f"Setting MoveAxis rate to {new_rate}")
+    shared_servers_cache['moveaxis_rate'] = new_rate
+    return '', 204
+
 
 @app.route('/status', methods=['GET'])
 def status():
@@ -211,6 +232,7 @@ if __name__ == '__main__':
         shared_servers_cache['shared_server_list'] = servers  # cache in memory, will be shared across users
 
         shared_servers_cache['telescope'] = None # can't create telescope until user has selected a server
+        shared_servers_cache['moveaxis_rate'] = 1.0 # default rate for MoveAxis
 
     except Exception as e:
         print(f"Error getting servers: {e}")

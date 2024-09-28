@@ -5,7 +5,8 @@
 
     <!-- combo to select tracking rates -->
     <!-- selections come from telescope itself -->
-    <div id="tracking-rate">
+     <fieldset>
+        <legend>Control Tracking</legend>
         <form hx-post="/update_tracking">
             <label for="tracking-enable">Enable / Disable Tracking:</label>
             <input type="checkbox" id="tracking-enable" name="tracking-enable"
@@ -22,7 +23,21 @@
             <br>
             <input type="submit" value="Change Tracking">
         </form>
-    </div>
+    </fieldset>
+
+    <fieldset>
+        <legend>Control MoveAxis (Slewing) Speed</legend>
+        <form hx-post="/update_moveaxis_rate">
+            <label for="moveaxis_rate">Select MoveAxis Speed:</label>
+            <select name="moveaxis_rate" id="moveaxis_rate">
+                {% for rate in moveaxis_rates %}
+                    <option value={{ rate.rate }}>{{ rate.name }} = {{ rate.rate }} </option>
+                {% endfor %}
+            </select>
+            <br>
+            <input type="submit" value="Set MoveAxis/Slewing Speed">
+        </form>
+    </fieldset>
 
     <div class="controller" id="controller">
         <!-- row 1 -->

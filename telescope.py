@@ -149,19 +149,38 @@ class AlpycaTelescope:
             print(f"Error setting telescope tracking rate: {e}")
             raise e
 
-    def get_axisrates(self, axis:TelescopeAxes= TelescopeAxes.axisPrimary) -> list[Rate]:
-        # axis is RA by default, a DocInt enum
+    def get_MoveAxis_rates(self, axis:TelescopeAxes= TelescopeAxes.axisPrimary) -> list[ dict[str, float] ]:
+        # compromise to support Maestro's non-ASCOM features
+        # this driver does the ASCOM, subclass will add Maestro features
+        rate_choices = []
         try:
+            # first get the ASCOM rates. These are list of [min, max] in degrees per second
             ar = self.T.AxisRates(axis)
-            return ar
+            # for now, return the min and max for each returned value.
+            # in long run, need to sample for 2x, 4x, 16x, etc.
+            choice_count = 0
+            for r in ar:
+                # the min for this rate range
+                rate_choice = {}
+                rate_choice['name'] = 'Rate ' + str(choice_count)
+                rate_choice['rate'] = r.minv # degrees per second
+                rate_choices.append(rate_choice)
+                choice_count += 1
+                # the max for this rate range
+                rate_choice = {}
+                rate_choice['name'] = 'Rate ' + str(choice_count)
+                rate_choice['rate'] = r.maxv # degrees per second
+                choice_count += 1
+                rate_choices.append(rate_choice)
+            return rate_choices
         
         except Exception as e:
             print(f"Error getting telescope axis rates: {e}")
             raise e
         
-    def moveAxis(self, direction):
+    def moveAxis(self, direction, rate): # rate is in degrees per second
         try:
-            rate = 1 # * 16 * DriveRates.driveSidereal # degrees per second
+            # rate = 1 # * 16 * DriveRates.driveSidereal # degrees per second
             if direction == 'Up':
                 # dec is postive up to NCP at 90, negative down to SCP at -90
                 self.T.MoveAxis(TelescopeAxes.axisSecondary, rate)

@@ -6,14 +6,21 @@
     <!-- combo to select tracking rates -->
     <!-- selections come from telescope itself -->
     <div id="tracking-rate">
-        <form hx-post="/set_tracking_rate">
+        <form hx-post="/update_tracking">
+            <label for="tracking-enable">Enable / Disable Tracking:</label>
+            <input type="checkbox" id="tracking-enable" name="tracking-enable"
+                 value="1" {% if tracking %}checked{% endif %}>
+            <br>
             <label for="tracking-rate">Select Tracking Rate:</label>
+            <!-- checkbox to enable tracking -->
             <select name="tracking-rate" id="tracking-rate">
                 {% for tr in tracking_rates %}
-                    <option value={{ tr.value }}>{{ tr.name }} </option>
+                    <option value={{ tr.value }} 
+                    {% if tr.value == current_tracking_rate %}selected{% endif %}>{{ tr.name }} </option>
                 {% endfor %}
             </select>
-            <input type="submit" value="Set Tracking Rate">
+            <br>
+            <input type="submit" value="Change Tracking">
         </form>
     </div>
 

@@ -58,22 +58,28 @@ class CacheTelescope:
 
         return None
     
-from alpaca.telescope import *      # Multiple Classes including Enumerations
+from alpaca.telescope import Rate, Telescope, DriveRates, TelescopeAxes 
 from alpaca.exceptions import *     # Or just the exceptions you want to catch
     
 
 class AlpycaTelescope:
-    def __init__(self, app):
+    def __init__(self, app, server_ip:str):
 
         # connect to the ASCOM telescope
-        self.T = Telescope('172.28.240.1:32323', 0) # Local Omni Simulator
+        self.server_ip = server_ip
+        self.T = Telescope(server_ip, 0) 
         
         try:
             self.T.Connected = True
             print("Connected to telescope with description: ", self.T.Description)
             print('Starting slew to 2 hours east of meridian')
+            print("Current Sideral Time: ", self.T.SiderealTime)
             self.T.Tracking = True
-            self.T.SlewToCoordinatesAsync(self.T.SiderealTime + 2, 50)    # 2 hrs east of meridian
+            new_ra = self.T.SiderealTime + 2
+            if new_ra > 24.0:
+                new_ra = new_ra - 24.0
+
+            self.T.SlewToCoordinatesAsync( new_ra, 50)    # 2 hrs east of meridian
 
         except Exception as e:
             print(f"Error connecting to telescope: {e}")
@@ -106,6 +112,13 @@ class AlpycaTelescope:
             print(f"Error checking if telescope is tracking: {e}")
             raise e
         
+    def set_tracking(self, tracking: bool):
+        try:
+            self.T.Tracking = tracking
+        except Exception as e:
+            print(f"Error setting telescope tracking: {e}")
+            raise e
+        
     def get_tracking_rate(self):
         try:
             tr : DriveRates = self.T.TrackingRate
@@ -117,8 +130,8 @@ class AlpycaTelescope:
     def get_tracking_rates(self) -> list[DriveRates]:
         try:
             # should return list list of enum DriveRates
-            # but over the wire, it loses the enum type
-            # so map it here
+            # but over the wire, it loses the enum type (becomes int)
+            # so map it back to DriveRates here
             trs = self.T.TrackingRates
             named_rates = []
             for tr in trs:
@@ -129,12 +142,23 @@ class AlpycaTelescope:
             raise e
         
     def set_tracking_rate(self, rate: DriveRates):
+        # expect rate to be an enum DriveRates
         try:
             self.T.TrackingRate = rate
         except Exception as e:
             print(f"Error setting telescope tracking rate: {e}")
             raise e
 
+    def get_axisrates(self, axis:TelescopeAxes= TelescopeAxes.axisPrimary) -> list[Rate]:
+        # axis is RA by default, a DocInt enum
+        try:
+            ar = self.T.AxisRates(axis)
+            return ar
+        
+        except Exception as e:
+            print(f"Error getting telescope axis rates: {e}")
+            raise e
+        
     def moveAxis(self, direction):
         try:
             rate = 1 # * 16 * DriveRates.driveSidereal # degrees per second
@@ -169,15 +193,15 @@ def get_servers(): # use alpaca.discovery to get available ALPACA servers
     from alpaca import management
     servers = []
     try:
-        print("Searching for servers...")
+        print("Searching for ALPACA servers...")
         svrs = discovery.search_ipv4(timeout=1)
-        print("found servers:",  svrs)
+        print("found ALPACA servers:",  svrs)
         for svr in svrs:
-            # return tuple of ip address and server name
+            # return tuple of ip address [0] and server name [1]
             servers.append( (svr, management.description(svr)['ServerName']) ) # type: ignore
 
     except Exception as e:
-        print(f"Error getting servers: {e}")
+        print(f"Error getting ALPACA servers: {e}")
         return []
 
     return servers

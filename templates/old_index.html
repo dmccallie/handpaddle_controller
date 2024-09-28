@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block content %}
+
+<!-- form to start search for servers -->
+<form hx-get="/server_search" hx-target="#server-search" hx-swap=outerHTML>
+    <input type="submit" value="Search for Servers">
+</form>
+
+<div>
+    <div id="server-search">
+        Push button above to start search for servers...
+    </div>
+</div>
+{% endblock %}

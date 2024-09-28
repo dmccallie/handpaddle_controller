@@ -10,13 +10,14 @@ body {
 
 .controller {
     display: grid;
-    grid-template-rows: 1fr 1fr 1fr;
-    grid-template-columns: 1fr 1fr 1fr;
+    grid-template-rows: 80px 80px 80px;
+    grid-template-columns: 110px 110px 110px;
     gap: 10px;
 }
 
 .controller button {
     padding: 20px;
+    width: 100px;
     font-size: 20px;
     cursor: pointer;
 }

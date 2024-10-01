@@ -230,6 +230,29 @@ class MaestroTelescope(AlpycaTelescope):
     # 5 = use the "slew" velocity
     # all rates will be at 100% of the velocity
 
+
+    def get_MoveAxis_rates(self, axis:TelescopeAxes= TelescopeAxes.axisPrimary) -> list[ dict[str, Any] ]:
+        # compromise to support Maestro's non-ASCOM features
+        # create fake rate choices for Maestro, since Maestro doesn't support AxisRates
+        
+        rate_choices = []
+        # create four fake rate choices, matching the four view velocities
+        for i in range(1, 5):
+            rate_choice = {}
+            rate_choice['number'] = i
+            rate_choice['name'] = 'View Velocity ' + str(i)
+            rate_choice['rate'] = i # not used for Maestro, but should fill in with actual rate
+            rate_choices.append(rate_choice)
+        
+        # add a fifth rate choice for "slew" velocity
+        rate_choice = {}
+        rate_choice['number'] = 5
+        rate_choice['name'] = 'Slew Velocity'
+        rate_choice['rate'] = 5 # not used for Maestro, but should fill in with actual rate
+
+        return rate_choices        
+
+
     def moveAxis(self, direction, rate_item: dict[str, Any]): # rate is in degrees per second
         print("entering MaestroTelescope.moveAxis")
         # for maestro, rate_item is a dict with keys 'number', 'name', 'rate'

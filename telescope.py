@@ -217,6 +217,15 @@ class AlpycaTelescope:
             print(f"Error stopping telescope: {e}")
             raise e
         
+    def command_string(self, command: str):
+        try:
+            resp = self.T.CommandString(command, True)
+            print(f"Command {command} returned: {resp}")
+            return resp
+        except Exception as e:
+            print(f"Error sending telescope command: {e}")
+            raise e
+        
 # subclass to handle Maestro specific features
 class MaestroTelescope(AlpycaTelescope):
     def __init__(self, app, server_ip:str):

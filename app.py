@@ -1,14 +1,49 @@
 from pathlib import Path
+import logging
 import sys
-from flask import Flask, render_template, jsonify, request, redirect, url_for
+from flask import Flask, render_template, jsonify, request, redirect, url_for, g
 import random
 import time
 from telescope import CacheTelescope, AlpycaTelescope, get_servers, MaestroTelescope
 from alpaca.telescope import DriveRates, TelescopeAxes
 
 app = Flask(__name__)
-shared_servers_cache = {} # global dictionary to hold server and telescope data
 
+# @app.before_request
+# def before_request():
+#     g.suppress_logging = False
+#     if request.path == '/status':  # suppress this one
+#         print("Suppressing logging for /status")
+#         g.suppress_logging = True
+
+# @app.after_request
+# def after_request(response):
+#     if g.suppress_logging:
+#         g.suppress_logging = False
+#     return response
+
+# doesnt work
+class SuppressLoggingFilter(logging.Filter):
+    def filter(self, record):
+        # # Suppress logging if the flag is set
+        # print("checking filter with suppress_logging = ", g.suppress_logging)
+        # if g.suppress_logging == True:
+        #     print("Filtering record ready to return true ", record)
+        #    return True
+        # print("filtering path = ", request.path)
+        if g and g.suppress_logging:
+            print("Filtering record = ", record)
+            return True
+        print("NOT Filtering record = ", record)
+        return False   
+    
+    
+# stop logging each request
+werkzeug_logger = logging.getLogger('werkzeug')
+werkzeug_logger.setLevel(logging.ERROR)
+# werkzeug_logger.addFilter(SuppressLoggingFilter())
+
+shared_servers_cache = {} # global dictionary to hold server and telescope data
 
 # initial page puts up note about searching for servers, starts HTMX GET
 #  for server_search
@@ -80,7 +115,7 @@ def server_select():
         print(f"Selected server: {selected_server}")
         # create telescope object and cache it
         try:
-            telescope = MaestroTelescope(app, selected_server[0]) # selected_server[0] is the IP address
+            telescope = AlpycaTelescope(app, selected_server[0]) # selected_server[0] is the IP address
             shared_servers_cache['telescope'] = telescope
         except Exception as e:
             print(f"Error connecting to telescope at {selected_server} error= {e}")
@@ -93,7 +128,7 @@ def server_select():
 def paddle():
 
     # should be connected to a telescope by now
-    telescope: MaestroTelescope = shared_servers_cache['telescope']
+    telescope: AlpycaTelescope = shared_servers_cache['telescope']
 
     # get the tracking rates supported by the telescope
     tracking_rates:list[ DriveRates ] = telescope.get_tracking_rates()
@@ -133,13 +168,20 @@ def paddle():
                 moveaxis_rates=moveaxis_rates, selected_rate=initial_rate_number, tracking=tracking)
 
 # control is called when a control button is pressed
+# initially was HTMX, but now POST + JSON with direction and event_type
 @app.route('/control', methods=['POST'])
 def control():
     # get the telescope object from the cache
-    telescope: MaestroTelescope = shared_servers_cache['telescope']
+    telescope: AlpycaTelescope = shared_servers_cache['telescope']
 
-    direction = request.form.get('direction')
-    event_type = request.form.get('event_type')
+    # get the json and extract the direction and event_type
+    json_data = request.get_json()
+    button_name = json_data['button_name']  #actually is id which gives direction
+    event_type = json_data['event_type']  # start or stop (pointer down or up)
+
+    # direction = request.form.get('direction')
+    # event_type = request.form.get('event_type')
+
     current_time = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
     
     # current slew rate is set via different POST event, so result was cached in shared memory
@@ -151,9 +193,9 @@ def control():
     else:
         rate_item = {'number': 1, 'name': 'missing rate selection', 'rate': 0.0002777777777777778}
     
-    print(f"control got {direction}-{event_type} at {current_time}")
+    print(f"control got {button_name}-{event_type} at {current_time}")
     
-    if direction == 'STOP':
+    if button_name == 'stop-btn':
         telescope.stop()
     
     # all moveaxis commands use the same "end" event
@@ -161,16 +203,23 @@ def control():
         telescope.stop()
     
     elif event_type == "start":
-        if direction == "UP":
+        if button_name == "up-btn":
             telescope.moveAxis('Up', rate_item)
-        elif direction == "DOWN":
+        elif button_name == "down-btn":
             telescope.moveAxis('Down', rate_item)
-        elif direction == "LEFT":
+        elif button_name == "left-btn":
             telescope.moveAxis('Left', rate_item)
-        elif direction == "RIGHT":
+        elif button_name == "right-btn":
             telescope.moveAxis('Right', rate_item)
 
-    return '', 204  # Empty response, HTMX does not require content.
+    # Return a JSON response indicating success
+    response = {
+        'status': 'success',
+        'message': f'Event {event_type} received for button {button_name}'
+    }
+    return jsonify(response), 200  # Return 200 OK with the JSON response
+
+    # return '', 204  # Empty response, HTMX does not require content.
 
 @app.route('/update_tracking', methods=['POST'])
 def update_tracking():
@@ -231,6 +280,14 @@ def status():
         coords['tracking_rate'] = telescope.get_tracking_rate()
     
     return render_template('telescope_coords.html', coords=coords)
+
+@app.route('/send_command', methods=['POST'])
+def send_command():
+    command = request.form.get('command')
+    print(f"Prepared to send command string: {command}")
+    telescope = shared_servers_cache['telescope']
+    resp = telescope.command_string(command)
+    return f"{resp}", 200
 
 if __name__ == '__main__':
 

@@ -5,7 +5,20 @@
 
     <!-- combo to select tracking rates -->
     <!-- selections come from telescope itself -->
-     <fieldset>
+    <fieldset>
+        <legend>Test Command String function</legend>
+        <form hx-post="/send_command"
+              hx-target="#response"
+              hx-swap="innerHTML">
+            <label for="command">Enter Command String:</label>
+            <input type="text" id="command" name="command">
+            <br>
+            Response: <textarea name="response" id="response">Response will come here</textarea>
+            <input type="submit" value="Send Command"> 
+        </form>
+    </fieldset>
+    <br>
+    <fieldset>
         <legend>Control Tracking</legend>
         <form hx-post="/update_tracking">
             <label for="tracking-enable">Enable / Disable Tracking:</label>
@@ -43,44 +56,70 @@
     <div class="controller" id="controller">
         <!-- row 1 -->
         <div></div>
-        <button 
-            hx-post="/control" 
-            hx-trigger="mousedown, mouseup from:body" 
-            hx-vals='js:{"direction":"UP", "event_type":(event.type==="mousedown")?"start":"end"}'
-            >UP
-        </button>
+        <button class="control-btn" id="up-btn">UP</button>
         <div></div>
 
         <!-- row 2 -->
-        <button 
+        <button class="control-btn" id="left-btn"> LEFT
+            <!-- old HTMX approach tried:
             hx-post="/control" 
-            hx-trigger="mousedown, mouseup from:body" 
-            hx-vals='js:{"direction":"LEFT", "event_type":(event.type==="mousedown")?"start":"end"}'>LEFT
+            hx-trigger="pointerdown, pointerup from:body" 
+            hx-vals='js:{"direction":"LEFT", "event_type":(event.type==="pointerdown")?"start":"end"}'
+            -->
         </button>
-        <button 
-            class="stop-btn" 
-            hx-post="/control"
-            hx-trigger="mousedown, mouseup from:body"
-            hx-vals='js:{"direction":"STOP", "event_type":(event.type==="mousedown")?"start":"end"}'>STOP
-        </button>
-        <button 
-            hx-post="/control" 
-            hx-trigger="mousedown, mouseup from:body" 
-            hx-vals='js:{"direction":"RIGHT", "event_type":(event.type==="mousedown")?"start":"end"}'>RIGHT
-        </button>
+        <button class="control-btn" id="stop-btn">STOP</button>
+        <button class="control-btn" id="right-btn">RIGHT</button>
 
         <!-- row three -->    
         <div></div>
-        <button 
-            hx-post="/control" 
-            hx-trigger="mousedown, mouseup from:body" 
-            hx-vals='js:{"direction":"DOWN", "event_type":(event.type==="mousedown")?"start":"end"}'>DOWN
-        </button>
+        <button class="control-btn" id="down-btn">DOWN</button>
         <div></div>
     </div>
 
     <div hx-get="/status" hx-trigger="every 500ms" hx-target="#status-table" hx-swap="outerHTML">
         {% include "telescope_coords.html" %}
     </div>
+
+<script>
+    // htmx.logAll()
+    // set up the event handlers for all the control buttons
+    document.querySelectorAll('.control-btn').forEach(button => {
+        
+        // Add event listener for pointerdown
+        button.addEventListener('pointerdown', function (event) {
+            // Capture the pointer for this button
+            button.setPointerCapture(event.pointerId);
+            sendPointerEvent(button.id, 'start');
+        });
+        
+        // Add event listener for pointerup
+        button.addEventListener('pointerup', function (event) {
+            // Release the pointer capture for this button
+            button.releasePointerCapture(event.pointerId);
+            sendPointerEvent(button.id, 'end');
+        });
+    });
+
+    // old code was: "direction":"LEFT", "event_type":(event.type==="pointerdown")?"start":"end"
+    // Function to send POST request to Flask server
+    function sendPointerEvent(buttonName, eventType) {
+        fetch('/control', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                button_name: buttonName,
+                event_type: eventType
+            })
+        })
+        .then(response => response.json())
+        .then(data => console.log('Data received from /control post:', data))
+        .catch((error) => {
+            console.error('Error after /control post: ', error);
+        });
+    }
+</script>
+
 {% endblock %}
 

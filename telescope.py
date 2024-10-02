@@ -185,7 +185,7 @@ class AlpycaTelescope:
     # rate will have been validated against the T.AxisRates list for this telescope
     # this doesn't work for Maestro, so subclass will override it
     def moveAxis(self, direction, rate_item: dict[str, Any]):
-        print("entering AlpycaTelescope.moveAxis")
+        print("entering AlpycaTelescope.moveAxis with direction: ", direction)
         # for ascom, rate_item is a dict with keys 'number', 'name', 'rate'
         # extract the selected rate (degrees per second)
         rate = float(rate_item['rate'])
@@ -208,11 +208,11 @@ class AlpycaTelescope:
         
     def stop(self):
         try:
-            if self.T.Slewing:
-                self.T.AbortSlew()
-                # very confusing, may need ddx between stop slew and stop MoveAxis?
-                self.T.MoveAxis(TelescopeAxes.axisPrimary, 0)
-        
+            # if self.T.Slewing:
+            #     self.T.AbortSlew()
+            #     # very confusing, may need ddx between stop slew and stop MoveAxis?
+            self.T.MoveAxis(TelescopeAxes.axisPrimary, 0)
+            self.T.MoveAxis(TelescopeAxes.axisSecondary, 0)
         except Exception as e:
             print(f"Error stopping telescope: {e}")
             raise e

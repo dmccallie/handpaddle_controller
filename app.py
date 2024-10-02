@@ -115,7 +115,7 @@ def server_select():
         print(f"Selected server: {selected_server}")
         # create telescope object and cache it
         try:
-            telescope = AlpycaTelescope(app, selected_server[0]) # selected_server[0] is the IP address
+            telescope = MaestroTelescope(app, selected_server[0]) # selected_server[0] is the IP address
             shared_servers_cache['telescope'] = telescope
         except Exception as e:
             print(f"Error connecting to telescope at {selected_server} error= {e}")
@@ -211,6 +211,8 @@ def control():
             telescope.moveAxis('Left', rate_item)
         elif button_name == "right-btn":
             telescope.moveAxis('Right', rate_item)
+        else:
+            print(f"Unknown button!!: {button_name}")
 
     # Return a JSON response indicating success
     response = {
@@ -286,6 +288,12 @@ def send_command():
     command = request.form.get('command')
     print(f"Prepared to send command string: {command}")
     telescope = shared_servers_cache['telescope']
+    # first send "enter" character to clear any previous command
+    # print("Sending ENTER command")
+    # telescope.command_string("\xB1")
+    # resp = telescope.command_string(command)
+    # print(f"ENTER Command response was: {resp}")
+
     resp = telescope.command_string(command)
     return f"{resp}", 200
 

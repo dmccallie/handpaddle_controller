@@ -76,7 +76,7 @@
         <div></div>
     </div>
 
-    <div hx-get="/status" hx-trigger="every 500ms" hx-target="#status-table" hx-swap="outerHTML">
+    <div hx-get="/status" hx-trigger="every 100s" hx-target="#status-table" hx-swap="outerHTML">
         {% include "telescope_coords.html" %}
     </div>
 

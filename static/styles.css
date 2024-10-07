@@ -13,10 +13,10 @@ input {
   }
 
 fieldset {
-    padding: 15px;
+    padding: 5px;
     border: 1px solid black;
     border-radius: 10px;
-    margin-bottom: 20px;
+    margin-bottom: 10px;
 }
 
 .controller {
@@ -63,4 +63,29 @@ th, td {
     padding: 10px;
     text-align: center;
     width: 100px;
+}
+
+.tr-button-container {
+    display: flex;
+    justify-content: center;
+    margin-top: 20px;
+}
+
+.tr-control-button {
+    padding: 10px 20px;
+    margin: 5px;
+    background-color: #f0f0f0;
+    border: 1px solid #ccc;
+    cursor: pointer;
+    transition: background-color 0.3s;    
+}
+
+.tr-control-button.active {
+    background-color: #4caf50; /* Highlight color for the active button */
+    color: white;
+}
+
+.tr-control-button.disabled { /* disalllow use during POST event */
+    background-color: #ccc;
+    cursor: not-allowed;
 }

@@ -244,6 +244,35 @@ def update_tracking():
         telescope.set_tracking_rate(DriveRates(rate))
     return '', 204
 
+@app.route('/update_tracking_json', methods=['POST'])
+def update_tracking_json():
+    # same as above, but using JSON instead of form data
+    # get the telescope object from the cache
+    telescope: AlpycaTelescope = shared_servers_cache['telescope']
+
+    if telescope is not None:
+        json_data = request.get_json()
+        rate = json_data['tracking-rate']
+        print(f"Setting tracking rate to {rate}")
+        # print("set tracking on/off to: ", tracking_on_off)
+        # if tracking_on_off == '1':
+        telescope.set_tracking(True)
+        # else:
+        #     telescope.set_tracking(False)
+        telescope.set_tracking_rate(DriveRates(int(rate)))
+
+            # Return a JSON response indicating success
+        response = {
+            'success': True,
+            'message': f'Tracking rate set to {DriveRates(int(rate))}'
+        }
+    else:
+        response = {
+            'success': False,
+            'message': 'No telescope connected'
+        }
+    return jsonify(response), 200  # Return 200 OK with the JSON response
+
 # called when changing the MoveAxis rate (not same as tracking rate!)
 # need to cache the selected "rate_item" since we don't have a way to get the current MA rate from telescope
 # rate item has all info needed for moveaxis either for ASCOM or Maestro

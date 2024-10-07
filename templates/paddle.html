@@ -18,6 +18,18 @@
         </form>
     </fieldset>
     <br>
+
+    <!-- tracking rates using buttons -->
+
+    <fieldset>
+        <legend>Push button to set tracking rate</legend>
+        <div class="tr-button-container">
+            {% for tr in tracking_rates %}
+                <button class="tr-control-button" onclick="toggle_tr_button(this, {{tr.value}})">{{tr.name}}</button>
+            {% endfor %}
+        </div>
+    </fieldset>
+    
     <fieldset>
         <legend>Control Tracking</legend>
         <form hx-post="/update_tracking">
@@ -76,7 +88,7 @@
         <div></div>
     </div>
 
-    <div hx-get="/status" hx-trigger="every 100s" hx-target="#status-table" hx-swap="outerHTML">
+    <div hx-get="/status" hx-trigger="every 1s" hx-target="#status-table" hx-swap="outerHTML">
         {% include "telescope_coords.html" %}
     </div>
 
@@ -117,6 +129,59 @@
         .then(data => console.log('Data received from /control post:', data))
         .catch((error) => {
             console.error('Error after /control post: ', error);
+        });
+    }
+
+    // Function to toggle tracking rate buttons and update server
+    function toggle_tr_button(button, tr_value) {
+        // tr_value is the number for the tracking rate list
+        
+        // Disable the button interaction while waiting for the POST response
+        disableButtons(true);
+
+        // Send the POST request (to special JSON endpoint)
+        fetch('/update_tracking_json', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ 'tracking-rate': tr_value }),
+        })
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Network response was not ok');
+            }
+            return response.json(); // Assuming the server responds with JSON
+        })
+        .then(data => {
+            if (data.success) {
+                // Success: Update the button display
+                const buttons = document.querySelectorAll('.tr-control-button');
+                buttons.forEach(btn => btn.classList.remove('active'));
+                button.classList.add('active');
+            } else {
+                alert('Failed to update on the server');
+            }
+        })
+        .catch(error => {
+            alert('Failed to send the tracking rate update: ' + error.message);
+        })
+        .finally(() => {
+            // Re-enable button interaction after the POST completes
+            disableButtons(false);
+        });
+    }
+
+    function disableButtons(disabled) {
+        const buttons = document.querySelectorAll('.control-button');
+        buttons.forEach(button => {
+            if (disabled) {
+                button.classList.add('disabled');
+                button.disabled = true;
+            } else {
+                button.classList.remove('disabled');
+                button.disabled = false;
+            }
         });
     }
 </script>

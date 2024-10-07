@@ -80,6 +80,12 @@ class AlpycaTelescope:
             # if new_ra > 24.0:
             #     new_ra = new_ra - 24.0
 
+            # get supported actions dumped to terminal
+            actions = self.T.SupportedActions
+            print("----------- Telescope's supported actions: ------------------")
+            for action in actions:
+                print(action)
+            print("------------------ End of supported actions ------------------")
             # self.T.SlewToCoordinatesAsync( new_ra, 50)    # 2 hrs east of meridian
 
         except Exception as e:

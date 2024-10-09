@@ -4,7 +4,9 @@ import time
 import win32com.client, pythoncom
 from telescope import AlpacaCOMTelescope
 
-# T = win32com.client.Dispatch('ASCOM.Simulator.Telescope')  # runs the .net version apparently?
+testMT = win32com.client.Dispatch('Maestro.Telescope')
+print("testMT returns ", testMT)
+
 comTele = AlpacaCOMTelescope(None, 'ASCOM.Simulator.Telescope') 
 T = comTele.T
 #T = win32com.client.CastTo(t, 'ITelescopeV4')  # this is the correct way to cast to the interface

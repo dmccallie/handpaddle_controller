@@ -95,8 +95,8 @@ class AlpycaTelescope:
     def send_command(self, command: str):
         try:
             # print(f"Sending command:{command}: to telescope")
-            resp = "FAKE RESPONSE"
-            #resp = self.T.CommandString(command, True)
+            # resp = "FAKE RESPONSE"
+            resp = self.T.CommandString(command, True)
             
             # print(f"Command {command} returned: {resp}")
             return resp
@@ -519,8 +519,8 @@ def get_servers(alpaca=True, com=True): # use alpaca.discovery to get available 
                 servers.append( (svr, management.description(svr)['ServerName'], "alpaca" )) # type: ignore
         if com:
             servers.append(('ASCOM.Simulator.Telescope', 'ASCOM Telescope Simulator', "com"))
-            # servers.append(('Maestro.Telescope', 'Maestro via COM', "maestro-com"))
-            servers.append(('ASCOM.Simulator.Telescope', 'Maestro via COM', "maestro-com"))
+            servers.append(('Maestro.Telescope', 'Maestro via COM', "maestro-com"))
+            # servers.append(('ASCOM.Simulator.Telescope', 'Maestro via COM', "maestro-com"))
 
         return servers
 

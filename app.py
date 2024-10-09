@@ -4,7 +4,11 @@ import sys
 from flask import Flask, render_template, jsonify, request, redirect, url_for, g
 import random
 import time
-from telescope import CacheTelescope, AlpycaTelescope, get_servers, MaestroTelescope
+
+import win32com
+from telescope import CacheTelescope, AlpycaTelescope, get_servers, \
+    MaestroCOMTelescope, AlpacaCOMTelescope
+
 from alpaca.telescope import DriveRates, TelescopeAxes
 
 app = Flask(__name__)
@@ -57,12 +61,13 @@ def index():
         if len(servers) > 0:
             servers_found = True
             # make first choice in combo box a "Select a server" choice - better way to do this?????
-            servers_for_combo = [{'index': 0, 'name': 'Select a server'}]
+            servers_for_combo = [{'index': 0, 'name': 'Select telescope', '':''}]
             for i, server in enumerate(servers):
                 new_server = {}
                 servers_for_combo.append(new_server)
                 new_server['index'] = i+1
                 new_server['name'] = f"{servers[i][0]} - {servers[i][1]}" 
+                new_server['type'] = servers[i][2] # "alpaca" or "com"
         else:
             servers_found = False
     else:
@@ -72,35 +77,6 @@ def index():
     return render_template('index.html', servers_found=servers_found,
                            servers_for_combo=servers_for_combo)
 
-# # sever_search is called by HTMX GET to get the list of servers
-# # populates combo and swaps into the index page
-# # don't need this with pre-fetching server list
-# @app.route('/server_search', methods=['GET'])
-# def server_search():
-    
-#     if 'servers' in shared_servers_cache:
-#         servers = shared_servers_cache['shared_server_list']
-#         print("Cached Servers found: ", servers)
-#     else:
-#         print("Server search started")
-#         shared_servers_cache['shared_servers'] = get_servers()
-#         servers = shared_servers_cache['shared_server_list']
-#         print("Server search returns: ", servers)
-
-#     servers_found = len(servers) > 0
-
-#     servers_for_combo = [{'index': 0, 'name': 'Select a server'}]
-#     for i, server in enumerate(servers):
-#         new_server = {}
-#         servers_for_combo.append(new_server)
-#         new_server['index'] = i+1
-#         new_server['name'] = f"{servers[i][0]} - {servers[i][1]}" 
-
-
-
-#     return render_template('select_server.html',  servers_found=servers_found,
-#                            servers_for_combo=servers_for_combo)
-  
 # server_select is called when a server is selected from the combo box using POST
 # then redirects to the paddle control page
 @app.route('/server_select', methods=['POST'])
@@ -114,9 +90,17 @@ def server_select():
         selected_server = shared_servers_cache['shared_server_list'][int(selected_option)-1]
         print(f"Selected server: {selected_server}")
         # create telescope object and cache it
+        # create the telescope object based on the server type
         try:
-            telescope = MaestroTelescope(app, selected_server[0]) # selected_server[0] is the IP address
+            if selected_server[2] == 'alpaca':
+                telescope = AlpycaTelescope(app, selected_server[0]) # selected_server[0] is the IP address
+            elif selected_server[2] == 'com':
+                telescope = AlpacaCOMTelescope(app, selected_server[0]) # selected_server[0] is the IP address
+            elif selected_server[2] == 'maestro-com':
+                telescope = MaestroCOMTelescope(app, selected_server[0])
+            
             shared_servers_cache['telescope'] = telescope
+            
         except Exception as e:
             print(f"Error connecting to telescope at {selected_server} error= {e}")
             return render_template('error.html', message="Error connecting to telescope")
@@ -165,7 +149,7 @@ def paddle():
             'ra': 0, 'dec': 0, 'slewing': False, 'tracking': False, 
             'tracking_rate': 0}, tracking_rates=tracking_rates, 
                 current_tracking_rate=current_tracking_rate,
-                moveaxis_rates=moveaxis_rates, selected_rate=initial_rate_number, tracking=tracking)
+                moveaxis_rates=moveaxis_rates, current_ma_rate=initial_rate_number, tracking=tracking)
 
 # control is called when a control button is pressed
 # initially was HTMX, but now POST + JSON with direction and event_type
@@ -281,16 +265,38 @@ def update_tracking_json():
 @app.route('/update_moveaxis_rate', methods=['POST'])
 def update_moveaxis_rate():
     new_rate_number = request.form.get('moveaxis_rate') # gets the rate number, not index
+
     if new_rate_number:
         new_rate_number = int(new_rate_number)
     else:
         new_rate_number = 1
-    # extract the rate item from the cached rates list
+
+    # extract and cache the rate item from the cached rates list
     rate_item = shared_servers_cache['moveaxis_rates'][new_rate_number]
 
     print(f"Caching new MoveAxis rate item to {rate_item}")
     shared_servers_cache['moveaxis_rate_item'] = rate_item
     return '', 204
+
+@app.route('/update_moveaxis_rate_json', methods=['POST'])
+def update_moveaxis_rate_json():
+    json_data = request.get_json()
+    new_rate_number = json_data['moveaxis_rate']
+    print("new rate json = ", json_data)
+
+    new_rate_number = int(new_rate_number)
+
+    print(f"Setting move axis rate to number: {new_rate_number}")
+    # extract the rate item from the cached rates list
+    rate_item = shared_servers_cache['moveaxis_rates'][new_rate_number]
+
+    print(f"Caching new MoveAxis rate item to {rate_item}")
+    shared_servers_cache['moveaxis_rate_item'] = rate_item
+    response = {    
+        'success': True,
+        'message': f'MoveAxis rate set to {rate_item["name"]}'
+    }
+    return jsonify(response), 200  # Return 200 OK with the JSON response
 
 
 @app.route('/status', methods=['GET'])
@@ -341,8 +347,15 @@ if __name__ == '__main__':
     # create a shared global object to hold the server location data (discovery data)
     # this object will be shared across users as well, since they are all on the same LAN
     # do that when app starts up, since it is a one-time operation
+
+    # can we connect to the telescope here and cache it??
+    import win32com.client, pythoncom
+    #test = win32com.client.Dispatch("ASCOM.Utilities.Chooser")
+    # test = win32com.client.Dispatch("ASCOM.Simulator.Telescope")
+    # print("connected to test = ", test)
+
     try:
-        servers = get_servers()
+        servers = get_servers(alpaca=False)
         # if this were a multi-server app, we'd need to use Redis or some other shared cache
         shared_servers_cache['shared_server_list'] = servers  # cache in memory, will be shared across users
 
@@ -354,4 +367,5 @@ if __name__ == '__main__':
         print(f"Error getting servers: {e}")
         sys.exit(1)
 
-    app.run(debug=True, port=5001)
+    # ASCOM com objects don't work with threaded=True
+    app.run(debug=True, port=5001, threaded=False)

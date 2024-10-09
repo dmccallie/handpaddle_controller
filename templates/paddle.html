@@ -17,7 +17,6 @@
             <input type="submit" value="Send Command"> 
         </form>
     </fieldset>
-    <br>
 
     <!-- tracking rates using buttons -->
 
@@ -25,44 +24,22 @@
         <legend>Push button to set tracking rate</legend>
         <div class="tr-button-container">
             {% for tr in tracking_rates %}
-                <button class="tr-control-button" onclick="toggle_tr_button(this, {{tr.value}})">{{tr.name}}</button>
+                <button class="tr-control-button  {% if tr.value == current_tracking_rate %} active {% endif %}" 
+                    onclick="toggle_tr_button(this, {{tr.value}})">{{tr.name}}</button>
             {% endfor %}
         </div>
     </fieldset>
     
     <fieldset>
-        <legend>Control Tracking</legend>
-        <form hx-post="/update_tracking">
-            <label for="tracking-enable">Enable / Disable Tracking:</label>
-            <input type="checkbox" id="tracking-enable" name="tracking-enable"
-                 value="1" {% if tracking %}checked{% endif %}>
-            <br>
-            <label for="tracking-rate">Select Tracking Rate:</label>
-            <!-- checkbox to enable tracking -->
-            <select name="tracking-rate" id="tracking-rate">
-                {% for tr in tracking_rates %}
-                    <option value={{ tr.value }} 
-                    {% if tr.value == current_tracking_rate %}selected{% endif %}>{{ tr.name }} </option>
-                {% endfor %}
-            </select>
-            <br>
-            <input type="submit" value="Change Tracking">
-        </form>
-    </fieldset>
-
-    <fieldset>
-        <legend>Control MoveAxis (Slewing) Speed</legend>
-        <form hx-post="/update_moveaxis_rate">
-            <label for="moveaxis_rate">Select MoveAxis Speed:</label>
-            <select name="moveaxis_rate" id="moveaxis_rate">
-                {% for rate in moveaxis_rates %}
-                    <option value={{ rate.number }} {% if rate.number == selected_rate %} selected {% endif %}>
-                        {{ rate.name }} = {{ rate.rate }} </option>
-                {% endfor %}
-            </select>
-            <br>
-            <input type="submit" value="Set MoveAxis/Slewing Speed">
-        </form>
+        <legend>Push button to set SLEW rate (move axis)</legend>
+        <div class="ma-button-container">
+            {% for rate in moveaxis_rates %}
+                <button class="ma-control-button {% if rate.number == current_ma_rate %} active {% endif %}" 
+                  onclick='toggle_ma_button(this, {{rate.number}})'>
+                  {{rate.name}}<br>{{'%0.2f'|format(rate.rate)}}&nbsp;d/s
+                </button>
+            {% endfor %}
+        </div>
     </fieldset>
 
     <div class="controller" id="controller">
@@ -168,12 +145,54 @@
         })
         .finally(() => {
             // Re-enable button interaction after the POST completes
-            disableButtons(false);
+            disableButtons('tr-control-btn', false);
         });
     }
 
-    function disableButtons(disabled) {
-        const buttons = document.querySelectorAll('.control-button');
+    // Function to toggle slew rate ("move axis") buttons and update server
+
+    function toggle_ma_button(button, rate_number) {
+        // ma_value is the rate number in the moveaxis rate list
+        
+        // Disable the button interaction while waiting for the POST response
+        disableButtons(true);
+
+        // Send the POST request (to special JSON endpoint)
+        fetch('/update_moveaxis_rate_json', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ 'moveaxis_rate': rate_number }),
+        })
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Network response was not ok');
+            }
+            return response.json(); // Assuming the server responds with JSON
+        })
+        .then(data => {
+            if (data.success) {
+                // Success: Update the button display
+                const buttons = document.querySelectorAll('.ma-control-button');
+                buttons.forEach(btn => btn.classList.remove('active'));
+                button.classList.add('active');
+            } else {
+                alert('Failed to update move axis rate on the server');
+            }
+        })
+        .catch(error => {
+            alert('Failed to send the move axis rate update: ' + error.message);
+        })
+        .finally(() => {
+            // Re-enable button interaction after the POST completes
+            disableButtons('ma-control-btn', false);
+        });
+    }    
+
+    function disableButtons(btn_class, disabled) {
+        // true means add disabled class, false means remove disabled class
+        const buttons = document.querySelectorAll(btn_class);
         buttons.forEach(button => {
             if (disabled) {
                 button.classList.add('disabled');

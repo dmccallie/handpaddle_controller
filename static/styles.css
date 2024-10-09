@@ -16,7 +16,13 @@ fieldset {
     padding: 5px;
     border: 1px solid black;
     border-radius: 10px;
-    margin-bottom: 10px;
+    margin-bottom: 30px;
+}
+
+fieldset legend {
+    font-size: 20px;
+    font-weight: bold;
+    text-align: center;
 }
 
 .controller {
@@ -24,9 +30,14 @@ fieldset {
     grid-template-rows: 80px 80px 80px;
     grid-template-columns: 110px 110px 110px;
     gap: 10px;
+    justify-content: center;
+    margin: 5px;
+    border-radius: 10px;
+    border: 1px solid black;
 }
 
 .controller button {
+    margin: 5px;
     padding: 20px;
     width: 100px;
     font-size: 20px;
@@ -68,7 +79,7 @@ th, td {
 .tr-button-container {
     display: flex;
     justify-content: center;
-    margin-top: 20px;
+    margin-top: 10px;
 }
 
 .tr-control-button {
@@ -86,6 +97,31 @@ th, td {
 }
 
 .tr-control-button.disabled { /* disalllow use during POST event */
+    background-color: #ccc;
+    cursor: not-allowed;
+}
+
+.ma-button-container {
+    display: flex;
+    justify-content: center;
+    margin-top: 10px;
+}
+
+.ma-control-button {
+    padding: 10px 20px;
+    margin: 5px;
+    background-color: #f0f0f0;
+    border: 1px solid #ccc;
+    cursor: pointer;
+    transition: background-color 0.3s;    
+}
+
+.ma-control-button.active {
+    background-color: #4caf50; /* Highlight color for the active button */
+    color: white;
+}
+
+.ma-control-button.disabled { /* disalllow use during POST event */
     background-color: #ccc;
     cursor: not-allowed;
 }

@@ -4,8 +4,8 @@ import time
 import win32com.client, pythoncom
 from telescope import AlpacaCOMTelescope
 
-testMT = win32com.client.Dispatch('Maestro.Telescope')
-print("testMT returns ", testMT)
+# testMT = win32com.client.Dispatch('Maestro.Telescope')
+# print("testMT returns ", testMT)
 
 comTele = AlpacaCOMTelescope(None, 'ASCOM.Simulator.Telescope') 
 T = comTele.T

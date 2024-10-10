@@ -357,7 +357,7 @@ if __name__ == '__main__':
     # print("connected to test = ", test)
 
     try:
-        servers = get_servers(alpaca=False)
+        servers = get_servers(alpaca=True, com=False)
         # if this were a multi-server app, we'd need to use Redis or some other shared cache
         shared_servers_cache['shared_server_list'] = servers  # cache in memory, will be shared across users
 

@@ -181,22 +181,31 @@ def control():
     
     print(f"control got {button_name}-{event_type} at {current_time}")
     
+    cur_direction = shared_servers_cache.get('current_ma_direction', "Unknown")
+
     if button_name == 'stop-btn':
-        telescope.stop()
+        telescope.stop(cur_direction)
+        shared_servers_cache['current_ma_direction'] = "Stop"
     
     # all moveaxis commands use the same "end" event
     elif event_type == "end":
-        telescope.stop()
-    
+        telescope.stop(cur_direction)
+        shared_servers_cache['current_ma_direction'] = "Stop"
+
     elif event_type == "start":
         if button_name == "up-btn":
             telescope.moveAxis('Up', rate_item)
+            shared_servers_cache['current_ma_direction'] = "Up"
         elif button_name == "down-btn":
             telescope.moveAxis('Down', rate_item)
+            shared_servers_cache['current_ma_direction'] = "Down"
         elif button_name == "left-btn":
             telescope.moveAxis('Left', rate_item)
+            shared_servers_cache['current_ma_direction'] = "Left"
         elif button_name == "right-btn":
             telescope.moveAxis('Right', rate_item)
+            shared_servers_cache['current_ma_direction'] = "Right"
+
         else:
             print(f"Unknown button!!: {button_name}")
 
@@ -278,6 +287,9 @@ def update_moveaxis_rate():
 
     print(f"Caching new MoveAxis rate item to {rate_item}")
     shared_servers_cache['moveaxis_rate_item'] = rate_item
+
+    # tell the telescope to set rate (only works for Maestro)
+
     return '', 204
 
 @app.route('/update_moveaxis_rate_json', methods=['POST'])
@@ -294,6 +306,11 @@ def update_moveaxis_rate_json():
 
     print(f"Caching new MoveAxis rate item to {rate_item}")
     shared_servers_cache['moveaxis_rate_item'] = rate_item
+
+    # tell the telescope (relevant for Maestro only)
+    telescope: AlpycaTelescope = shared_servers_cache['telescope']
+    telescope.set_moveaxis_rate(rate_item)
+
     response = {    
         'success': True,
         'message': f'MoveAxis rate set to {rate_item["name"]}'
@@ -357,7 +374,7 @@ if __name__ == '__main__':
     # print("connected to test = ", test)
 
     try:
-        servers = get_servers(alpaca=True, com=False)
+        servers = get_servers(alpaca=False, com=True)
         # if this were a multi-server app, we'd need to use Redis or some other shared cache
         shared_servers_cache['shared_server_list'] = servers  # cache in memory, will be shared across users
 

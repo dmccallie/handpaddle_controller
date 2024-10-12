@@ -412,7 +412,7 @@ class MaestroCOMTelescope(AlpacaCOMTelescope):
             rate_choice['name'] = 'View Velocity ' + str(i+1)
             cmd = f"KGv{i+1}"
             resp = self._send_command(cmd)
-            rate_choice['rate'] = resp # I think this is a string with units
+            rate_choice['rate'] = i+1 # I think this is a string with units
             rate_choices.append(rate_choice)
         
         # add a fifth rate choice for "slew" velocity
@@ -421,7 +421,7 @@ class MaestroCOMTelescope(AlpacaCOMTelescope):
         rate_choice['name'] = 'Slew Velocity'
         cmd = "KGcv" # get current view velocity
         resp = self._send_command(cmd)
-        rate_choice['rate'] = resp # I think this is a string with units
+        rate_choice['rate'] = 5 # I think this is a string with units
         rate_choices.append(rate_choice)
 
         return rate_choices        
@@ -501,7 +501,7 @@ class MaestroCOMTelescope(AlpacaCOMTelescope):
                 print(f"Stopping LeftRight motion with command {cmd} direction:{direction} returned: {resp}")
             
             elif direction == 'Up' or direction == 'Down':
-                cmd = "XXup"
+                cmd = "XXud"
                 resp = self._send_command(cmd)
                 # resp = self.T.CommandString(cmd, True)
                 print(f"Stopping UpDown motion with command {cmd} direction:{direction} returned: {resp}")
@@ -515,6 +515,11 @@ class MaestroCOMTelescope(AlpacaCOMTelescope):
         except Exception as e:
             print(f"Error stopping telescope: {e}")
             raise e
+        
+    def _send_command(self, cmd:str):
+        # our Maestro only takes one command
+        resp = self.T.CommandString(cmd)
+        return resp
 
 def get_servers(alpaca=True, com=True): # use alpaca.discovery to get available ALPACA servers
     # added support for "com" servers, hand-enumerated for now

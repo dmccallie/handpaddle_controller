@@ -136,8 +136,8 @@ class AlpycaTelescope:
         
     def get_tracking_rate(self):
         try:
-            tr : DriveRates = self.T.TrackingRate
-            return tr
+            tr = self.T.TrackingRate
+            return DriveRates(tr)
         except Exception as e:
             print(f"Error getting telescope tracking rate: {e}")
             raise e

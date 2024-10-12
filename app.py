@@ -348,7 +348,13 @@ def send_command():
     # resp = telescope.command_string(command)
     # print(f"ENTER Command response was: {resp}")
 
-    resp = telescope.command_string(command)
+    try:
+        resp = telescope.command_string(command)
+        resp = resp.strip()
+
+    except Exception as e:
+        resp = f"Exception sending command: {e}"
+    
     return f"{resp}", 200
 
 if __name__ == '__main__':

@@ -1,6 +1,6 @@
 import threading
 from typing import Any
-from flask_caching import Cache
+# from flask_caching import Cache
 from pathlib import Path
 
 class CacheTelescope:
@@ -92,13 +92,9 @@ class AlpycaTelescope:
             print(f"Error connecting to telescope: {e}")
             raise e
     
-    def send_command(self, command: str):
+    def _send_command(self, command: str):
         try:
-            # print(f"Sending command:{command}: to telescope")
-            # resp = "FAKE RESPONSE"
             resp = self.T.CommandString(command, True)
-            
-            # print(f"Command {command} returned: {resp}")
             return resp
         except Exception as e:
             print(f"Error sending telescope command: {e}")
@@ -201,7 +197,13 @@ class AlpycaTelescope:
         except Exception as e:
             print(f"Error getting telescope axis rates: {e}")
             raise e
-        
+    
+    def set_moveaxis_rate(self, rate_item: dict[str, Any]):
+        # for ascom and alpaca scopes this doesnt do anything
+        # for Maestro, it will set the view velocity
+        pass
+
+
     # rate is in degrees per second, extracted from the rate_choices list
     # rate will have been validated against the T.AxisRates list for this telescope
     # this doesn't work for Maestro, so subclass will override it
@@ -228,7 +230,8 @@ class AlpycaTelescope:
             print(f"Error moving telescope axis: {e}")
             raise e
         
-    def stop(self):
+    def stop(self, direction:str):
+        # for Maestro, direction is used, not for Alpaca/ASCOM
         try:
             # if self.T.Slewing:
             #     self.T.AbortSlew()
@@ -241,7 +244,7 @@ class AlpycaTelescope:
         
     def command_string(self, command: str):
         try:
-            resp = self.send_command(command)
+            resp = self._send_command(command)
             # resp = self.T.CommandString(command, True)
             print(f"Command String with {command} returned: {resp}")
             return resp
@@ -253,6 +256,7 @@ class AlpycaTelescope:
 import win32com.client
 
 class AlpacaCOMTelescope(AlpycaTelescope):
+    # using COM to connect, not really "alpaca" but subclassed from AlpycaTelescope
     def __init__(self, app, server_ip:str):
         # super().__init__(app, server_ip)
         try:
@@ -272,11 +276,11 @@ class AlpacaCOMTelescope(AlpycaTelescope):
             #     new_ra = new_ra - 24.0
 
             # get supported actions dumped to terminal
-            actions = self.T.SupportedActions
-            print("----------- Telescope's supported actions: ------------------")
-            for action in actions:
-                print(action)
-            print("------------------ End of supported actions ------------------")
+            # actions = self.T.SupportedActions
+            # print("----------- Telescope's supported actions: ------------------")
+            # for action in actions:
+            #     print(action)
+            # print("------------------ End of supported actions ------------------")
             # self.T.SlewToCoordinatesAsync( new_ra, 50)    # 2 hrs east of meridian
 
         except Exception as e:
@@ -369,7 +373,7 @@ class AlpacaCOMTelescope(AlpycaTelescope):
             print(f"Error moving telescope axis: {e}")
             raise e
         
-    def stop(self):
+    def stop(self, direction:str):
         try:
             # if self.T.Slewing:
             #     self.T.AbortSlew()
@@ -394,82 +398,92 @@ class MaestroCOMTelescope(AlpacaCOMTelescope):
     # 5 = use the "slew" velocity
     # all rates will be at 100% of the velocity
 
-
-
     def get_MoveAxis_rates(self, axis:TelescopeAxes= TelescopeAxes.axisPrimary) -> list[ dict[str, Any] ]:
         # compromise to support Maestro's non-ASCOM features
-        # create fake rate choices for Maestro, since Maestro doesn't support AxisRates
+        # use view velocities instead of ASCOMs get AxisRates'
+        # when should the get called to refresh?
         
         rate_choices = []
-        # create four fake rate choices, matching the four view velocities
+        # create four fake rate choices, matching the four view velocities bur feth
+        #   current rate from Maestro
         for i in range(0, 4): #0,1,2,3,
             rate_choice = {}
             rate_choice['number'] = i
             rate_choice['name'] = 'View Velocity ' + str(i+1)
-            rate_choice['rate'] = i # not used for Maestro, but should fill in with actual rate
+            cmd = f"KGv{i+1}"
+            resp = self._send_command(cmd)
+            rate_choice['rate'] = resp # I think this is a string with units
             rate_choices.append(rate_choice)
         
         # add a fifth rate choice for "slew" velocity
         rate_choice = {}
         rate_choice['number'] = 4
         rate_choice['name'] = 'Slew Velocity'
-        rate_choice['rate'] = 5 
+        cmd = "KGcv" # get current view velocity
+        resp = self._send_command(cmd)
+        rate_choice['rate'] = resp # I think this is a string with units
         rate_choices.append(rate_choice)
 
         return rate_choices        
 
-
-    def moveAxis(self, direction, rate_item: dict[str, Any]): # rate is in degrees per second
-        print("entering MaestroCOMTelescope.moveAxis")
-        # for maestro, rate_item is a dict with keys 'number', 'name', 'rate'
-        # number tells us which view velocity to use
-
+    def set_moveaxis_rate(self, rate_item: dict[str, Any]):
+        # for Maestro, this sets the View Velocity, which will effect subsequent MoveAxis commands
+        # we also use this to go in and out of slew mode
+        # number tells us which view velocity to use, 0 to 3 for view velocities 1 to 4, 4 for slew velocity
         view_velocity_number = int(rate_item['number'])
 
         # set the view velocity - maybe this should be a separate paddle control??
-        # vvnumber is 0 to 3 for view velocities 1 to 4, 5 for slew velocity
-        if view_velocity_number < 0 or view_velocity_number >= 5:
-            raise ValueError("Invalid view velocity number")
+        # vvnumber is 0 to 3 for view velocities 1 to 4, 4 for slew velocity
+        if view_velocity_number < 0 or view_velocity_number > 4:
+            raise ValueError("Invalid view velocity index number")
         if view_velocity_number == 4:
-            cmd = "!KSsl:100;" # set to slew velocity
+            cmd = "KSsl" # put in slew mode
+            resp = self._send_command(cmd)
+            print(f"Setting view velocity to Slew mode with command {cmd} returned  {resp}")
         else:
-            # set to pre-defined view velocity 1-4
-            cmd = f"!KScv:{view_velocity_number+1};"
+            # set to Maestro's view velocity 1-4
+            cmd = f"KScv{view_velocity_number+1}"
+            resp = self._send_command(cmd)
+            # and then make sure its not in slew mode
+            cmd = "KCsl" # take out of slew mode
+            resp = self._send_command(cmd)
+            print(f"set VV and took out of slew mode with command {cmd} returned: {resp}")
+            
 
-        # resp=self.T.CommandString(cmd, True)
-        resp = self.send_command(cmd)
-        print(f"Setting view velocity to {cmd} returned: {resp}")
+    def moveAxis(self, direction, rate_item: dict[str, Any]): # rate is in degrees per second
+        # for maestro we don't use rate_item - see set_moveaxis_rate
+        print("entering MaestroCOMTelescope.moveAxis")
 
         try:
             if direction == 'Up':
                 # dec is postive up to NCP at 90, negative down to SCP at -90
                 # self.T.MoveAxis(TelescopeAxes.axisSecondary, rate)
-                cmd = "!KSpu:100;"
+                cmd = "KSpu100"
                 # resp = self.T.CommandString(cmd, True)
-                resp = self.send_command(cmd)
+                resp = self._send_command(cmd)
                 print(f"Start moving axis UP with command {cmd} returned: {resp}")
             
             elif direction == 'Down':
                 # uses whatever view velocity was set to but always at 100%
-                cmd = "!KSpd:100;"
+                cmd = "KSpd100"
                 #resp = self.T.CommandString(cmd, True)
-                resp = self.send_command(cmd)
+                resp = self._send_command(cmd)
                 print(f"Start moving axis DOWN with command {cmd} returned: {resp}")
                 #self.T.MoveAxis(TelescopeAxes.axisSecondary, -rate)
                 # self.T.CommandString('Arbitrary Maestro command for DOWN here', True)
             
             elif direction == 'Left':
-                cmd = "!KSpl:100;"
+                cmd = "KSpl100"
                 # resp = self.T.CommandString(cmd, True)
-                resp = self.send_command(cmd)
+                resp = self._send_command(cmd)
                 print(f"Start moving axis LEFT with command {cmd} returned: {resp}")
 
                 #self.T.MoveAxis(TelescopeAxes.axisPrimary, -rate) #RA
                 # self.T.CommandString('Arbitrary Maestro command for LEFT here', True)
             elif direction == 'Right':
-                cmd = "!KSpr:100;"
+                cmd = "KSpr100"
                 # resp = self.T.CommandString(cmd, True)
-                resp = self.send_command(cmd)
+                resp = self._send_command(cmd)
                 print(f"Start moving axis RIGHT with command {cmd} returned: {resp}")
                 # self.T.MoveAxis(TelescopeAxes.axisPrimary, rate)
                 # self.T.CommandString('Arbitrary Maestro command for RIGHT here', True)
@@ -477,27 +491,27 @@ class MaestroCOMTelescope(AlpacaCOMTelescope):
             print(f"Error moving telescope axis: {e}")
             raise e
         
-    # Maestro stops left and right motion with separate commands
-    # for now, we will stop both motions, since we don't know which was started
-    # will also stop slew to target (if any)
-    def stop(self):
+
+    def stop(self, direction:str):
         try:
-            #if self.T.Slewing:
-            cmd = "!XXam;" # stop all automatic motion (GoTo slews etc)
-            resp = self.send_command(cmd)
-            # resp = self.T.CommandString(cmd, True)
-            print(f"Stopping all automatic motion with command {cmd} returned: {resp}")
-
-            cmd = "!XXlr;"
-            resp = self.send_command(cmd)
-            # resp = self.T.CommandString(cmd, True)
-            print(f"Stopping LeftRight motion with command {cmd} returned: {resp}")
-
-            cmd = "!XXup;"
-            resp = self.send_command(cmd)
-            # resp = self.T.CommandString(cmd, True)
-            print(f"Stopping UpDown motion with command {cmd} returned: {resp}")
-
+            if direction == 'Left' or direction == 'Right':
+                cmd = "XXlr"
+                resp = self._send_command(cmd)
+                # resp = self.T.CommandString(cmd, True)
+                print(f"Stopping LeftRight motion with command {cmd} direction:{direction} returned: {resp}")
+            
+            elif direction == 'Up' or direction == 'Down':
+                cmd = "XXup"
+                resp = self._send_command(cmd)
+                # resp = self.T.CommandString(cmd, True)
+                print(f"Stopping UpDown motion with command {cmd} direction:{direction} returned: {resp}")
+            
+            else:
+                print(f"Unknown direction to stop: {direction} - stopping all motion")
+                cmd = "XXam" # stop all automatic motion (GoTo slews etc)
+                resp = self._send_command(cmd)
+                print(f"Stopping all automatic motion with command {cmd} returned: {resp}")
+        
         except Exception as e:
             print(f"Error stopping telescope: {e}")
             raise e

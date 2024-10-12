@@ -5,19 +5,6 @@
 
     <!-- combo to select tracking rates -->
     <!-- selections come from telescope itself -->
-    <fieldset>
-        <legend>Test Command String function</legend>
-        <form hx-post="/send_command"
-              hx-target="#response"
-              hx-swap="innerHTML">
-            <label for="command">Enter Command String:</label>
-            <input type="text" id="command" name="command">
-            <br>
-            Response: <textarea name="response" id="response">Response will come here</textarea>
-            <input type="submit" value="Send Command"> 
-        </form>
-    </fieldset>
-
     <!-- tracking rates using buttons -->
 
     <fieldset>
@@ -68,6 +55,19 @@
     <div hx-get="/status" hx-trigger="every 1s" hx-target="#status-table" hx-swap="outerHTML">
         {% include "telescope_coords.html" %}
     </div>
+
+    <fieldset class="commandstring">
+        <legend>Test Command String function</legend>
+        <form hx-post="/send_command"
+              hx-target="#response"
+              hx-swap="innerHTML">
+            <label for="command">Enter Command String:</label>
+            <input type="text" id="command" name="command">
+            <br>
+            Response: <textarea name="response" id="response">Response will come here</textarea>
+            <input type="submit" value="Send Command"> 
+        </form>
+    </fieldset>
 
 <script>
     // htmx.logAll()

@@ -537,6 +537,7 @@ class AlpacaMaestroTelescope(AlpycaTelescope):
 
     def _send_command(self, command: str):
         # custom version of CommandString for Maestro, supressing the "raw" parameter
+        # NO, send the raw to Ascom Remote, and the suppression occurs there, before forwarding to Maestro
         try:
             resp = self.T.CommandString(command, True) 
             return resp

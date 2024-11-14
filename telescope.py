@@ -287,6 +287,7 @@ class AlpacaCOMTelescope(AlpycaTelescope):
             print(f"Error connecting to telescope: {e}")
             raise e
         
+                
     def get_MoveAxis_rates(self, axis:TelescopeAxes= TelescopeAxes.axisPrimary) -> list[ dict[str, Any] ]:
             # COM version, using different def of Rate
             rate_choices = []
@@ -515,6 +516,157 @@ class MaestroCOMTelescope(AlpacaCOMTelescope):
         except Exception as e:
             print(f"Error stopping telescope: {e}")
             raise e
+# class for Alpaca connection to a Maestro telescope
+# overrides MoveAxis and adds Maestro specific features
+# must use variant version (7.0.1) of ASCOM REMOTE that supresses "raw" parameter in SendCommand
+class AlpacaMaestroTelescope(AlpycaTelescope):
+    def __init__(self, app, server_ip:str):
+        
+        # connect to the ASCOM telescope
+        self.server_ip = server_ip
+        self.T = Telescope(server_ip, 0) 
+        
+        try:
+            self.T.Connected = True
+            print("Connected with Alpaca Maestro to telescope with description: ", self.T.Description)
+            print("Current Telescope Sideral Time: ", self.T.SiderealTime)
+            self.T.Tracking = True
+        except Exception as e:
+            print(f"Error connecting to telescope: {e}")
+            raise e
+
+    def _send_command(self, command: str):
+        # custom version of CommandString for Maestro, supressing the "raw" parameter
+        try:
+            resp = self.T.CommandString(command, True) 
+            return resp
+        except Exception as e:
+            print(f"Error sending telescope command: {e}")
+            raise e
+        
+    # Maestro doesn't support MoveAxis, so override it using CommandString
+    # rate will be a number that determines which "view velocity" to use
+    # 1 = view velocity 1, 2 = view velocity 2, etc.
+    # 5 = use the "slew" velocity
+    # all rates will be at 100% of the velocity
+
+    def get_MoveAxis_rates(self, axis:TelescopeAxes= TelescopeAxes.axisPrimary) -> list[ dict[str, Any] ]:
+        # compromise to support Maestro's non-ASCOM features
+        # use view velocities instead of ASCOMs get AxisRates'
+        # when should the get called to refresh?
+        
+        rate_choices = []
+        # create four fake rate choices, matching the four view velocities bur fetch
+        #   current rate from Maestro
+        for i in range(0, 4): #0,1,2,3,
+            rate_choice = {}
+            rate_choice['number'] = i
+            rate_choice['name'] = 'View Velocity ' + str(i+1)
+            cmd = f"KGv{i+1}"
+            resp = self._send_command(cmd)
+            rate_choice['rate'] = resp # float?
+            rate_choices.append(rate_choice)
+        
+        # add a fifth rate choice for "slew" velocity
+        rate_choice = {}
+        rate_choice['number'] = 4
+        rate_choice['name'] = 'Slew Velocity'
+        cmd = "KGcv" # get current view velocity
+        resp = self._send_command(cmd)
+        rate_choice['rate'] = resp # I think this is a string with units
+        rate_choices.append(rate_choice)
+
+        return rate_choices        
+
+    def set_moveaxis_rate(self, rate_item: dict[str, Any]):
+        # for Maestro, this sets the View Velocity, which will effect subsequent MoveAxis commands
+        # we also use this to go in and out of slew mode
+        # number tells us which view velocity to use, 0 to 3 for view velocities 1 to 4, 4 for slew velocity
+        view_velocity_number = int(rate_item['number'])
+
+        # set the view velocity - maybe this should be a separate paddle control??
+        # vvnumber is 0 to 3 for view velocities 1 to 4, 4 for slew velocity
+        if view_velocity_number < 0 or view_velocity_number > 4:
+            raise ValueError("Invalid view velocity index number")
+        if view_velocity_number == 4:
+            cmd = "KSsl" # put in slew mode
+            resp = self._send_command(cmd)
+            print(f"Setting view velocity to Slew mode with command {cmd} returned  {resp}")
+        else:
+            # set to Maestro's view velocity 1-4
+            cmd = f"KScv{view_velocity_number+1}"
+            resp = self._send_command(cmd)
+            # and then make sure its not in slew mode
+            cmd = "KCsl" # take out of slew mode
+            resp = self._send_command(cmd)
+            print(f"set VV and took out of slew mode with command {cmd} returned: {resp}")
+            
+
+    def moveAxis(self, direction, rate_item: dict[str, Any]): # rate is in degrees per second
+        # for maestro we don't use rate_item - see set_moveaxis_rate
+        print("entering MaestroCOMTelescope.moveAxis")
+
+        try:
+            if direction == 'Up':
+                # dec is postive up to NCP at 90, negative down to SCP at -90
+                # self.T.MoveAxis(TelescopeAxes.axisSecondary, rate)
+                cmd = "KSpu100"
+                # resp = self.T.CommandString(cmd, True)
+                resp = self._send_command(cmd)
+                print(f"Start moving axis UP with command {cmd} returned: {resp}")
+            
+            elif direction == 'Down':
+                # uses whatever view velocity was set to but always at 100%
+                cmd = "KSpd100"
+                #resp = self.T.CommandString(cmd, True)
+                resp = self._send_command(cmd)
+                print(f"Start moving axis DOWN with command {cmd} returned: {resp}")
+                #self.T.MoveAxis(TelescopeAxes.axisSecondary, -rate)
+                # self.T.CommandString('Arbitrary Maestro command for DOWN here', True)
+            
+            elif direction == 'Left':
+                cmd = "KSpl100"
+                # resp = self.T.CommandString(cmd, True)
+                resp = self._send_command(cmd)
+                print(f"Start moving axis LEFT with command {cmd} returned: {resp}")
+
+                #self.T.MoveAxis(TelescopeAxes.axisPrimary, -rate) #RA
+                # self.T.CommandString('Arbitrary Maestro command for LEFT here', True)
+            elif direction == 'Right':
+                cmd = "KSpr100"
+                # resp = self.T.CommandString(cmd, True)
+                resp = self._send_command(cmd)
+                print(f"Start moving axis RIGHT with command {cmd} returned: {resp}")
+                # self.T.MoveAxis(TelescopeAxes.axisPrimary, rate)
+                # self.T.CommandString('Arbitrary Maestro command for RIGHT here', True)
+        except Exception as e:
+            print(f"Error moving telescope axis: {e}")
+            raise e
+        
+    def stop(self, direction:str):
+        try:
+            if direction == 'Left' or direction == 'Right':
+                cmd = "XXlr"
+                resp = self._send_command(cmd)
+                # resp = self.T.CommandString(cmd, True)
+                print(f"Stopping LeftRight motion with command {cmd} direction:{direction} returned: {resp}")
+            
+            elif direction == 'Up' or direction == 'Down':
+                cmd = "XXud"  # fixme?
+                resp = self._send_command(cmd)
+                # resp = self.T.CommandString(cmd, True)
+                print(f"Stopping UpDown motion with command {cmd} direction:{direction} returned: {resp}")
+            
+            else:
+                print(f"Unknown direction to stop: {direction} - stopping all motion")
+                cmd = "XXam" # stop all automatic motion (GoTo slews etc)
+                resp = self._send_command(cmd)
+                print(f"Stopping all automatic motion with command {cmd} returned: {resp}")
+        
+        except Exception as e:
+            print(f"Error stopping telescope: {e}")
+            raise e
+        
 
 def get_servers(alpaca=True, com=True): # use alpaca.discovery to get available ALPACA servers
     # added support for "com" servers, hand-enumerated for now
@@ -525,13 +677,14 @@ def get_servers(alpaca=True, com=True): # use alpaca.discovery to get available 
     servers = []
     try:
         if alpaca:
-            print("Searching for ASCOM servers...")
+            print("Searching for Alpaca servers...")
             svrs = discovery.search_ipv4(timeout=1)
             print("found ALPACA servers:",  svrs)
             for svr in svrs:
             # tuple of ip address [0] and server name [1], server_type [2]
                 servers.append( (svr, management.description(svr)['ServerName'], "alpaca" )) # type: ignore
         if com:
+            print("Adding possible COM servers...")
             servers.append(('ASCOM.Simulator.Telescope', 'ASCOM Telescope Simulator', "com"))
             servers.append(('Maestro.Telescope', 'Maestro via COM', "maestro-com"))
             # servers.append(('ASCOM.Simulator.Telescope', 'Maestro via COM', "maestro-com"))

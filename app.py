@@ -7,7 +7,7 @@ import time
 
 import win32com
 from telescope import CacheTelescope, AlpycaTelescope, get_servers, \
-    MaestroCOMTelescope, AlpacaCOMTelescope
+    MaestroCOMTelescope, AlpacaCOMTelescope, AlpacaMaestroTelescope
 
 from alpaca.telescope import DriveRates, TelescopeAxes
 
@@ -94,8 +94,12 @@ def server_select():
         # create telescope object and cache it
         # create the telescope object based on the server type
         try:
-            if selected_server[2] == 'alpaca':
-                telescope = AlpycaTelescope(app, selected_server[0]) # selected_server[0] is the IP address
+            # tuple of ip address [0] and server name [1], server_type [2]
+            # if the server name contains "maestro", then it is a Maestro server
+            if selected_server[2] == 'alpaca' and 'remote' in selected_server[1].lower():
+                telescope = AlpacaMaestroTelescope(app, selected_server[0]) # selected_server[0] is the IP address
+            elif selected_server[2] == 'alpaca':
+                telescope = AlpycaTelescope(app, selected_server[0])
             elif selected_server[2] == 'com':
                 telescope = AlpacaCOMTelescope(app, selected_server[0]) # selected_server[0] is the IP address
             elif selected_server[2] == 'maestro-com':
@@ -380,7 +384,7 @@ if __name__ == '__main__':
     # print("connected to test = ", test)
 
     try:
-        servers = get_servers(alpaca=False, com=True)
+        servers = get_servers(alpaca=True, com=True)
         # if this were a multi-server app, we'd need to use Redis or some other shared cache
         shared_servers_cache['shared_server_list'] = servers  # cache in memory, will be shared across users
 
@@ -393,4 +397,4 @@ if __name__ == '__main__':
         sys.exit(1)
 
     # ASCOM com objects don't work with threaded=True
-    app.run(debug=True, port=5001, threaded=False)
+    app.run(debug=True, port=5001, threaded=False, host='0.0.0.0')

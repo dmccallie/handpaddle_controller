@@ -1,4 +1,5 @@
 import threading
+import time
 from typing import Any
 # from flask_caching import Cache
 from pathlib import Path
@@ -539,7 +540,9 @@ class AlpacaMaestroTelescope(AlpycaTelescope):
         # custom version of CommandString for Maestro, supressing the "raw" parameter
         # NO, send the raw to Ascom Remote, and the suppression occurs there, before forwarding to Maestro
         try:
+            start = time.perf_counter()
             resp = self.T.CommandString(command, True) 
+            print(f"Command String with {command} returned: {resp} took: {(time.perf_counter()-start)*1000:.4f}mSec")
             return resp
         except Exception as e:
             print(f"Error sending telescope command: {e}")

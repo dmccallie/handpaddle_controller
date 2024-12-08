@@ -23,7 +23,7 @@
             {% for rate in moveaxis_rates %}
                 <button class="ma-control-button {% if rate.number == current_ma_rate %} active {% endif %}" 
                   onclick='toggle_ma_button(this, {{rate.number}})'>
-                  {{rate.name}}<br>{{rate.rate}}&nbsp;d/s
+                  {{rate.name}}<br>{{rate.rate}}
                 </button>
             {% endfor %}
         </div>

@@ -63,7 +63,15 @@ class CacheTelescope:
 from alpaca.telescope import Rate, Telescope, DriveRates, TelescopeAxes 
 from alpaca.exceptions import *     # Or just the exceptions you want to catch
     
+import re
 
+def extract_float(string):
+    match = re.search(r"[-+]?\d*\.\d+|\d+", string)
+    if match:
+        return float(match.group())
+    else:
+        return 0.0
+    
 class AlpycaTelescope:
     def __init__(self, app, server_ip:str):
 
@@ -411,7 +419,7 @@ class MaestroCOMTelescope(AlpacaCOMTelescope):
         for i in range(0, 4): #0,1,2,3,
             rate_choice = {}
             rate_choice['number'] = i
-            rate_choice['name'] = 'View Velocity ' + str(i+1)
+            rate_choice['name'] = 'VV ' + str(i+1)
             cmd = f"KGv{i+1}"
             resp = self._send_command(cmd)
             rate_choice['rate'] = i+1 # I think this is a string with units
@@ -420,7 +428,7 @@ class MaestroCOMTelescope(AlpacaCOMTelescope):
         # add a fifth rate choice for "slew" velocity
         rate_choice = {}
         rate_choice['number'] = 4
-        rate_choice['name'] = 'Slew Velocity'
+        rate_choice['name'] = 'Slew'
         cmd = "KGcv" # get current view velocity
         resp = self._send_command(cmd)
         rate_choice['rate'] = 5 # I think this is a string with units
@@ -565,19 +573,25 @@ class AlpacaMaestroTelescope(AlpycaTelescope):
         for i in range(0, 4): #0,1,2,3,
             rate_choice = {}
             rate_choice['number'] = i
-            rate_choice['name'] = 'View Velocity ' + str(i+1)
+            rate_choice['name'] = 'VV ' + str(i+1)
             cmd = f"KGv{i+1}"
             resp = self._send_command(cmd)
-            rate_choice['rate'] = resp # float?
+            # extract float value from string with units using regex
+            rate_f = extract_float(resp)
+            rcf = f"{rate_f:.2f} amin/sec"
+            rate_choice['rate'] = rcf
             rate_choices.append(rate_choice)
         
         # add a fifth rate choice for "slew" velocity
         rate_choice = {}
         rate_choice['number'] = 4
-        rate_choice['name'] = 'Slew Velocity'
+        rate_choice['name'] = 'Slew'
         cmd = "KGcv" # get current view velocity
         resp = self._send_command(cmd)
-        rate_choice['rate'] = resp # I think this is a string with units
+        # extract float value from string with units using regex
+        rate_f = extract_float(resp)
+        rcf = f"{rate_f:.2f} deg/sec"
+        rate_choice['rate'] = rcf # This is a string with units
         rate_choices.append(rate_choice)
 
         return rate_choices        

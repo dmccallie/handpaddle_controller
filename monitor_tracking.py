@@ -9,6 +9,17 @@ import logging
 import time
 import winsound  # Add this import at the top with your other imports
 
+def send_command(command: str):
+    # custom version of CommandString for Maestro, supressing the "raw" parameter
+    # NO, send the raw to Ascom Remote, and the suppression occurs there, before forwarding to Maestro
+    try:
+        # start = time.perf_counter()
+        resp = T.CommandString(command, True) 
+        # print(f"Command String with {command} returned: {resp} took: {(time.perf_counter()-start)*1000:.4f}mSec")
+        return resp
+    except Exception as e:
+        print(f"Error sending telescope command: {e}")
+        raise e
 
 def monitor_tracking(wait_sec = 1.0, random_slews=False):
     # don't start if scope is not tracking
@@ -21,6 +32,9 @@ def monitor_tracking(wait_sec = 1.0, random_slews=False):
     prior_ra = T.RightAscension
     prior_dec = T.Declination
     prior_tracking = True
+    prior_move_mode = send_command("PGmm")  # Get initial move mode
+    logging.info(f"Initial Telescope Move Mode: {prior_move_mode}")
+
     if random_slews:
         logging.info("Random slews enabled. Will slew to random positions during monitoring.")
     count = 0
@@ -48,20 +62,31 @@ def monitor_tracking(wait_sec = 1.0, random_slews=False):
                 random_slew()
                 changed_by_random_slew = True
         try:
+            measure_start = time.perf_counter()
             t = T.Tracking
             ra = T.RightAscension
             dec = T.Declination
+
+            # get move mode
+            move_mode = send_command("PGmm")
+            # logging.info(f"Move Mode: {move_mode}")
             
-            if (t != prior_tracking) or (ra != prior_ra) or (dec != prior_dec):
+            if (t != prior_tracking) or (ra != prior_ra) or (dec != prior_dec) or (move_mode != prior_move_mode):
+
+                seconds = (prior_ra - ra) * 3600 # convert RA difference to seconds
                 
-                logging.info(f"Telescope status changed: Tracking: {t}, RA: {ra}, DEC: {dec}")
+                logging.info(f"Telescope status changed: Tracking: {t}, RA: {ra} (delta seconds: {seconds}), DEC: {dec} Move Mode: {move_mode}")
                 if not changed_by_random_slew:
-                    play_alert(frequency=800, duration=500, repeats=5)  # More urgent alert
-                
+                    play_alert(frequency=800, duration=100, repeats=2)  # More urgent alert
+                    pass
+
                 prior_tracking = t
                 prior_ra = ra
                 prior_dec = dec
+                prior_move_mode = move_mode
                 changed_by_random_slew = False  # Reset the flag after processing
+                measure_time = time.perf_counter() - measure_start
+                logging.info(f"Tracking check took {measure_time:.4f} seconds")
 
             time.sleep(wait_sec)  # Check every wait_sec seconds
 
@@ -115,5 +140,5 @@ if __name__ == "__main__":
         raise e
 
     # Start monitoring tracking
-    monitor_tracking(wait_sec=1.0, random_slews=True)
+    monitor_tracking(wait_sec=1.0, random_slews=False)
     # Note: random_slews is not used in this version, but can be implemented later if needed
